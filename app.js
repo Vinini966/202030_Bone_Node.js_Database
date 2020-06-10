@@ -8,14 +8,13 @@ var bodyParser = require('body-parser');
 var passport = require('passport');
 var mongoose = require('mongoose');
 var db = require('./helper/database');
+var bcrypt = require('bcryptjs');
 
-//load routes
-var games = require('./routes/games');
-var users = require('./routes/users');
 
 //load passport
-require('./config/passport')(passport);
+//require('./config/passport')(passport);
 
+var dbConnError = false;
 
 //connect to mongoose
 mongoose.connect(db.mongoURI ,{
@@ -24,9 +23,16 @@ mongoose.connect(db.mongoURI ,{
 }).then(function(){
     console.log('mongodb connected');
 }).catch(function(err){
+    dbConnError = true;
     console.log(err);
 });
 
+//Database schemas
+require('./models/User');
+var User = mongoose.model('usernames');
+//Database schemas
+require('./models/Game');
+var Game = mongoose.model('playerdata');
 
 
 //require method override
@@ -64,26 +70,73 @@ app.use(function(req,res,next){
     next();
 });
 
-//get route using express handlebars
-app.get('/', function(req, res){
-    var title = "Welcome to the Game Library App"
-    res.render('index',{
-        title:title
+const PORT = process.env.PORT || 3000
+
+var server = app.listen(PORT, function(){
+  console.log("Server started on port " + PORT);
+});
+
+
+var io = require('socket.io').listen(server);
+
+
+io.on('connection', function(socket){
+
+    console.log("Incomming Connection...");
+
+    socket.emit('handshake');
+
+    socket.on('CreateNewAccount', function(data){
+        var newUser = new User({
+            user: data.username,
+            email:data.email,
+            password:data.password,
+        });
+
+        console.log(newUser);
+
+        bcrypt.genSalt(10, function(err, salt){
+            bcrypt.hash(newUser.password, salt, function(err, hash){
+                if(err)throw err;
+                newUser.password = hash;
+                newUser.save().then(function(user){
+                    socket.emit('NewAccountConfirmation')
+                }).catch(function(err){
+                    socket.emit("ERR", {errCode:1})
+                    console.log(err);
+                    return;
+                });
+            });
+        });
+
     });
-});
 
-app.get('/about', function(req, res){
-    res.render('about');
-});
+    socket.on("CheckLogin", function(data){
+        User.findOne({
+            user:data.username
+        }).then(function(user){
+            if(!user){
+                socket.emit("ERR", {errCode:2})
+                return;
+            }
+            console.log("user found");
+            //compares passwords
+            bcrypt.compare(data.password, user.password, function(err, isMatch){
+                if(err)throw err;
+                if(isMatch){
+                    socket.emit("LoginReturn", {
+                        result:true
+                    })
+                    return;
+                }
+                else{
+                    socket.emit("LoginReturn", {
+                        result:false
+                    })
+                    return;
+                }
+            });
+        });
+    });
 
-//use our routes
-app.use('/game', games);
-app.use('/users', users);
-
-//connects server to port
-var port = process.env.PORT || 5000;
- 
-
-app.listen(port, function(){
-    console.log("Game Library running on port 5000");
 });

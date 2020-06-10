@@ -2,14 +2,11 @@ var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 
 var GameSchema = new Schema({
-    title:{
-        type:String
+    inventory:{
+        type:Schema.Types.Mixed
     },
-    price:{
-        type:Number
-    },
-    description:{
-        type:String
+    playerPref:{
+        type:Schema.Types.Mixed
     },
     user:{
         type:String,
@@ -17,5 +14,5 @@ var GameSchema = new Schema({
     }
 });
 
-mongoose.model('games', GameSchema);
+mongoose.model('playerdata', GameSchema);
 
