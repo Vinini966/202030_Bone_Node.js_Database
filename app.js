@@ -9,6 +9,7 @@ var passport = require('passport');
 var mongoose = require('mongoose');
 var db = require('./helper/database');
 var bcrypt = require('bcryptjs');
+var nodemailer = require("nodemailer");
 
 
 //load passport
@@ -33,6 +34,8 @@ var User = mongoose.model('usernames');
 //Database schemas
 require('./models/Game');
 var Game = mongoose.model('playerdata');
+
+
 
 
 //require method override
@@ -89,32 +92,49 @@ io.on('connection', function(socket){
     socket.on('CreateNewAccount', function(data){
         var newUser = new User({
             user: data.username,
-            email:data.email,
-            password:data.password,
+            email: data.email,
+            password: data.password,
         });
 
-        console.log(newUser);
+        User.findOne({ //check for user if duplicate send error
+            user:newUser.user
+        }).then(function(user){
+            if(!user){
 
-        bcrypt.genSalt(10, function(err, salt){
-            bcrypt.hash(newUser.password, salt, function(err, hash){
-                if(err)throw err;
-                newUser.password = hash;
-                newUser.save().then(function(user){
-                    socket.emit('NewAccountConfirmation')
-                }).catch(function(err){
-                    socket.emit("ERR", {errCode:1})
-                    console.log(err);
-                    return;
+                bcrypt.genSalt(10, function(err, salt){//encrypt password
+                    bcrypt.hash(newUser.password, salt, function(err, hash){
+                        
+                        if(err)throw err;
+                        newUser.password = hash;
+                        newUser.save().then(function(user){
+                            socket.emit('NewAccountConfirmation')
+                        }).catch(function(err){
+                            socket.emit("ERR", {errCode:1})
+                            console.log(err);
+                            return;
+                        });
+                    });
                 });
-            });
-        });
+
+            }
+            else{
+                socket.emit("ERR", {errCode:3})
+            }
+        })
+
+
+
+        
 
     });
 
     socket.on("CheckLogin", function(data){
+        console.log(data.username);
+        console.log(data.password);
         User.findOne({
             user:data.username
         }).then(function(user){
+            console.log(user);
             if(!user){
                 socket.emit("ERR", {errCode:2})
                 return;
@@ -124,18 +144,68 @@ io.on('connection', function(socket){
             bcrypt.compare(data.password, user.password, function(err, isMatch){
                 if(err)throw err;
                 if(isMatch){
+                    console.log(true);
                     socket.emit("LoginReturn", {
                         result:true
                     })
                     return;
                 }
                 else{
+                    console.log(false);
                     socket.emit("LoginReturn", {
                         result:false
                     })
                     return;
                 }
             });
+        });
+    });
+
+    socket.on("RequestPassword", function(data){
+        User.findOne({
+            user:data.username
+        }).then(function(user){
+            
+        });
+    });
+
+    socket.on("SetPlayerData", function(data){
+        Game.findOne({
+            user:data.username
+        }).then(function(user){
+            if(!user){
+                var newUserData = new Game({
+                    savedata: data.lump,
+                    user: data.username
+                });
+
+                newUserData.save().then(function(user){
+                    socket.emit("PlayerDataConfirmation");
+                });
+            }
+            else{
+                user.savedata = data.lump;
+                user.markModified('savedata');
+                user.save().then(function(callback){
+                    socket.emit("PlayerDataConfirmation");
+                });
+            }
+
+        });
+    })
+
+    socket.on("GetPlayerData", function(data){
+        Game.findOne({
+            user:data.username
+        }).then(function(user){
+            if(!user){
+                socket.emit("ERR", {errCode:2})
+                return;
+            }
+            else{
+                console.log("Sending Player Data");
+                socket.emit("PlayerDataReturn", user);
+            }
         });
     });
 
