@@ -41,6 +41,9 @@ var Game = mongoose.model('playerdata');
 //require method override
 app.use(methodOverride('_method'));
 
+
+app.use(express.static('views/images'));
+
 //this code sets up template engine as express handlebars
 app.engine('handlebars', exphbs({defaultLayout:'main'}));
 app.set('view engine', 'handlebars');
@@ -57,10 +60,6 @@ app.use(session({
     saveUninitialized:true
 }));
 
-//initializes passport
-app.use(passport.initialize());
-app.use(passport.session());
-
 //Setup for flash messaging
 app.use(flash());
 
@@ -71,6 +70,60 @@ app.use(function(req,res,next){
     res.locals.error = req.flash('error');
     res.locals.user = req.user || null;
     next();
+});
+
+app.get('/', function(req, res){
+    res.render("main");
+});
+
+app.get('/register', function(req, res){
+    res.render("register");
+});
+
+app.post('/register', function(req, res){
+    //register stuff
+    var errors = [];
+
+    if(req.body.password != req.body.password2){
+        errors.push({text:"Passwords do not match."});
+    }
+    if(req.body.password.length < 4){
+        errors.push({text:"Password is fewer than 4 characters."});
+    }
+    if(errors.length > 0){
+        res.render('users/register',{
+            errors:errors,
+            name:req.body.name,
+            email:req.body.email,
+            password:req.body.password,
+            password2:req.body.password2
+        });
+    }else{
+        var newUser = new User({
+            user:req.body.name,
+            email:req.body.email,
+            password:req.body.password,
+        });
+        
+        bcrypt.genSalt(10, function(err, salt){
+            bcrypt.hash(newUser.password, salt, function(err, hash){
+                if(err)throw err;
+                newUser.password = hash;
+                newUser.save().then(function(user){
+                    res.redirect('/');
+                }).catch(function(err){
+                    console.log(err);
+                    errors.push({err:err});
+                    res.render('/',{
+                        errors:errors,
+                    });
+                    return;
+                });
+            });
+        });
+
+        
+    }
 });
 
 const PORT = process.env.PORT || 3000
@@ -184,8 +237,9 @@ io.on('connection', function(socket){
                 });
             }
             else{
+                
                 user.savedata = data.lump;
-                user.markModified('savedata');
+
                 user.save().then(function(callback){
                     socket.emit("PlayerDataConfirmation");
                 });
