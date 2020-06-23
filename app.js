@@ -91,7 +91,7 @@ app.post('/register', function(req, res){
         errors.push({text:"Password is fewer than 4 characters."});
     }
     if(errors.length > 0){
-        res.render('users/register',{
+        res.render('register',{
             errors:errors,
             name:req.body.name,
             email:req.body.email,
@@ -129,8 +129,9 @@ app.post('/register', function(req, res){
 
             }
             else{
+                console.log("Username in use.");
                 errors.push({text:"Username is already in use."});
-                res.render('users/register',{
+                res.render('register',{
                     errors:errors,
                     name:req.body.name,
                     email:req.body.email,

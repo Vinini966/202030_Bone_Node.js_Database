@@ -2,6 +2,17 @@
     <div class="col-md-6 mx-auto" >
         <div class="card card-body">
             <h3 class="text-center">Account Register</h3>
+            {{#if errors}}
+            <div class = "danger">
+            <ul>
+                {{#each errors}}
+                    <li>{{text}}</li>
+                {{/each}}
+            </ul>
+            </div>
+            {{else}}
+
+            {{/if}}
             <form action="/register" method="POST">
                 <div class="form-group">
                     <label for="name">Username</label>
