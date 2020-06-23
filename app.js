@@ -104,23 +104,43 @@ app.post('/register', function(req, res){
             email:req.body.email,
             password:req.body.password,
         });
-        
-        bcrypt.genSalt(10, function(err, salt){
-            bcrypt.hash(newUser.password, salt, function(err, hash){
-                if(err)throw err;
-                newUser.password = hash;
-                newUser.save().then(function(user){
-                    res.redirect('/');
-                }).catch(function(err){
-                    console.log(err);
-                    errors.push({err:err});
-                    res.render('/',{
-                        errors:errors,
+
+        User.findOne({ //check for user if duplicate send error
+            user:newUser.user
+        }).then(function(user){
+            if(!user){
+
+                bcrypt.genSalt(10, function(err, salt){
+                    bcrypt.hash(newUser.password, salt, function(err, hash){
+                        if(err)throw err;
+                        newUser.password = hash;
+                        newUser.save().then(function(user){
+                            res.redirect('/');
+                        }).catch(function(err){
+                            console.log(err);
+                            errors.push({err:err});
+                            res.render('/',{
+                                errors:errors,
+                            });
+                            return;
+                        });
                     });
-                    return;
                 });
-            });
-        });
+
+            }
+            else{
+                errors.push({text:"Username is already in use."});
+                res.render('users/register',{
+                    errors:errors,
+                    name:req.body.name,
+                    email:req.body.email,
+                    password:req.body.password,
+                    password2:req.body.password2
+                });
+            }
+        })
+        
+        
 
         
     }
